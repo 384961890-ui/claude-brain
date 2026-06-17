@@ -1,0 +1,13 @@
+# runtime state — never commit
+state/
+*.log
+
+# user's own config (ship config.example.json instead)
+config.json
+
+# deps & OS noise
+node_modules/
+.DS_Store
+
+# settings backups created by install.js
+*.bak-*

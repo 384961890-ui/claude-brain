@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/poster.png" alt="Claude Brain" width="380"/>
+<img src="assets/poster.png" alt="Claude Brain" width="760"/>
 
 # Claude Brain · Shitcode Red-Light
 

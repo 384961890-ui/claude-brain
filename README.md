@@ -1,222 +1,140 @@
 <div align="center">
 
-<img src="assets/poster-v8.1.png" alt="Claude Brain" width="820"/>
+<img src="assets/poster.png" alt="Claude Brain" width="380"/>
 
-# Claude Brain · v2 – v8.1
+# Claude Brain · Shitcode Red-Light
 
-**给 AI agent 装的运行时大脑:治模型的坏习惯、跨会话保住身份、从你的纠正里自己长记性。**
+**A PostToolUse hook for Claude Code that catches shitcode the moment you write it —
+and forces a conscious choice instead of letting it slide.**
 
-*Runtime cognitive substrate for AI agents — disciplines trained-in LLM instincts,
-preserves agent identity across sessions and hosts, self-improves from real user corrections.*
-
-在 Claude Code 与 ZCode 双宿主生产环境连续运行 4 个月 · 纯 Node stdlib 零外部依赖 · MIT
-
-**觉得这套思路有点东西?给个 ⭐ —— 对一个即将定格的开源项目 star 就是它的墓志铭和勋章。**
+`zero deps` · `language-agnostic` · `soft-inject, never blocks` · `~400 lines`
 
 </div>
 
----
-
-## 📌 关于这个版本(先读这段)
-
-**v8.1 是 Brain 的最后一个开源版本。** 从下一版起 Brain 转为我们产品的底层引擎,涉及商业内核,不再公开。三件事说清楚:
-
-1. **仓库不会关。** v8.1 全部代码 + 七个版本的设计文档永久留在这里。MIT,随便用、随便改、随便拆。
-2. **你拿到的是完整引擎,不是完整大脑。** 七条正交回路的代码一行没删;剥掉的是我们生产环境的记忆库、身份层和四个月磨出来的调校数据 —— 那部分是护城河。即便如此,它也比市面上大多数"炒作项目"好用那么一点点 🤏
-3. **帮我们跑数据的开发者有终身通道。** 装了 v8.1 并交回过研究数据(见 [research volunteers](#for-research-volunteers-v8-efficacy-data) 段)的开发者,闭源后的新功能、新优化会持续通过邮件单独发给你 —— 一份匿名的聚合数据,换一个终身内测位。报名方式:开一个 GitHub Issue 标 `[volunteer]`,或交数据时留下邮箱。
+> [!NOTE]
+> Unofficial, community project. **Not affiliated with or endorsed by Anthropic.**
+> "Claude" is a trademark of Anthropic, PBC.
 
 ---
 
-## What it does
+## The problem
 
-**Orthogonal loops**, each targeting a different LLM instinct (not vertical layers):
+LLMs — and humans — write shitcode for the same reason: **the code runs *now*, so the
+reward is immediate. The cost of bad structure is in the future, where it's invisible.**
 
-| Version | Treats | Mechanism | Hook |
-|:---|:---|:---|:---|
-| **v2 honest-loop** | Self-deception (says more than does) | UserPromptSubmit injection + MCP confidence self-check + Stop audit | UserPromptSubmit, Stop |
-| **v3 think-loop** | Single-direction stuckness (can't back off / pivot / decompose) | Stop detects "stuck" signals → next UserPromptSubmit injects breakthrough checklist | Stop, UserPromptSubmit |
-| **v4 idea-loop** | Sunk-cost stuckness + CEO-mode drift + context overflow | UserPromptSubmit context-aware injection (intent + cwd + branch) | UserPromptSubmit |
-| **v5 multimodal ingest** | Index blind spot for images/PDFs | Manual CLI: Vision OCR + image captioning + PDFKit → semantic index | (Manual CLI) |
-| **v6 smell-check** | Shortcut-prone messy code | PostToolUse hook: 6 soft detectors (long file/function, dead code, TODO pileup, debug leftover, hardcoded secret) | PostToolUse |
-| **v7 lessons** | Convert user corrections → recallable lessons with time decay | Stop: capture correction signal → draft lesson. inject-context: load top-N confirmed. Decay: active>3m → cooling → archive | Stop, PostToolUse, UserPromptSubmit |
-| **v7.2 dual-host** | Same brain, two bodies (Claude Code + ZCode) with per-host injection weight | `IS_ZCODE` auto-detect in `inject-context.js` + `zcode-shim/` bridging for transcript-shape mismatch | UserPromptSubmit, Stop, PostToolUse |
-| **v7.2 index-gardener** | Memory index rot (orphan .md files, stale entries not verified in 90+ days) | Deterministic nightly scan of memory/, no LLM. Read-only report + diary append. | (launchd/cron) |
-| **v8 efficacy-attribution** | Lessons decayed on a timer alone, with no signal on whether they actually helped | `track-behavior.js` accumulates a per-session behavior score; when `capture-lesson.js` retires state files older than 7 days, `efficacy.js` settles that session's final score onto every lesson it activated (`lesson.efficacy.{sessions,score_sum,last_scores}`) before deleting them. `decay-lessons.js` reads this: activated 5+ times with avg<0.5 → early cooling (skip the 90-day wait); avg>=0.8 → same ×2 protection identity-class lessons get. Also adds two new correction-signal classes (false-success reports, permission-loop retries) and lightweight lesson conflict detection (token-overlap flagging, not embeddings) | Stop, PostToolUse, PostToolUseFailure |
+"Just make it work" is an instant payoff. Clean architecture pays off later, to someone
+else, maybe never to you. So the model defaults to the corner-cut: a 600-line function,
+a key pasted into source, a `console.log` left behind, five TODOs that never come back.
 
-**Orthogonal principle:** Each loop targets one specific LLM instinct, none overlap. Adding a new loop requires answering: *"what instinct does this treat that existing loops don't?"*
+A linter doesn't fix this — it gives you an error list you scroll past. The *motivation*
+to cut the corner is untouched.
 
----
+**Shitcode Red-Light translates the delayed cost into an immediate signal — right at the
+second you write the code — and forces a binary choice:**
 
-## Architecture
+<div align="center">
+<img src="assets/demo.png" alt="demo" width="620"/>
+</div>
 
-```
-Brain = runtime cognitive substrate
-  ├─ N orthogonal loops (each treats one LLM instinct)
-  ├─ Lives outside the model  — works with any LLM
-  ├─ Lives outside the host   — works with any agent harness (v7.2: CC + ZCode)
-  └─ Self-improves via user-correction-driven lessons (v7)
-```
+> **(1) fix it now**, or **(2) write one line on _why you're not_.**
 
-This is **not** a memory system. Memory (CLAUDE.md, Auto memory) handles *"what I know"*. Brain handles *"what I do"* — the disciplines that shape behavior between thoughts.
+It treats the *motivation*, not a metric. Hand-waving costs more than just doing it.
 
 ---
 
-## Status
+## What it catches
 
-- **v2 – v8**: production-deployed on Claude Code (Opus 4.6 / 4.7 / 4.8, Sonnet 4.6, Haiku 4.5) and ZCode (GLM-5.2)
-- **~600 KB source** (runtime data excluded from this distribution)
-- **7 hook event types used**: UserPromptSubmit, PostToolUse, PostToolUseFailure, Stop, plus MCP integration
-- **Dependencies**:
-  - v3 / v4 / v6 / v7 / v7.2 / v8: pure Node stdlib, zero external
-  - v2 honest-loop: optional DeepSeek API for ensemble confidence signals
-  - v5 ingest: macOS Vision / PDFKit + LLM for image captioning
-  - QMD semantic search daemon (optional): local Qwen embedding + reranker
+Six pure, dependency-free, language-agnostic detectors:
+
+| Detector | Fires when |
+|:---|:---|
+| 🔴 `hardcoded_secret` | `sk-`/`AKIA`/PEM/`gh_` tokens, or `key=...` literals with real entropy |
+| `file_too_long` | yellow > 500 lines · red > 800 |
+| `long_function` | one contiguous code block > 80 real-code lines |
+| `dead_code` | commented-out code blocks ≥ 6 lines (JSDoc-exempt) |
+| `todo_pileup` | ≥ 5 TODO/FIXME/HACK/XXX in one file |
+| `debug_leftover` | ≥ 2 `console.log`/`debugger` in a non-test file |
+
+Every threshold lives in `config.json` — tune one place, no code changes.
+
+## How it works
+
+<div align="center">
+<img src="assets/architecture.png" alt="architecture" width="720"/>
+</div>
+
+**Why PostToolUse?** A pre-prompt reminder is *too early* (you haven't touched code yet);
+a session-end audit is *too late* (the shitcode already exists). PostToolUse fires at the
+exact second a file is written — the moment shitcode is actually born.
+
+**Why soft-inject, never block?** A PostToolUse `decision:block` does **not** roll back
+the written file, and the rejection drives a retry of the same write → file unchanged →
+block again → **infinite loop until tokens run out.** So every finding is a soft injection
+(even secrets — surfaced loudly with 🔴, but never blocking). Hard-blocking is reserved
+for a future PreToolUse hook. See [docs/DESIGN.md](docs/DESIGN.md) for the full rationale.
 
 ---
 
-## Setup
+## Install
 
-### Claude Code (primary host)
+Requires Node.js (18+) and Claude Code.
 
-1. Clone to `~/.claude-brain/`
-2. Copy `config.json.example` → `config.json` (adjust paths if needed)
-3. Run `bash install-hooks.sh` (registers hooks in `~/.claude/settings.json`)
-4. Optional: set up QMD daemon for semantic memory search (see `scripts/`)
-
-### ZCode (secondary host, v8.1)
-
-1. Same clone / config as above (shared brain directory)
-2. Run `bash install-zcode-hooks.sh`
-
-The installer updates only claude-brain-owned entries in `~/.zcode/cli/config.json`; unrelated hooks,
-plugins, MCP servers, and settings are preserved. It is idempotent and creates a timestamped backup only
-when the config changes.
-
-ZCode runs through `zcode-shim/zcode-hook-router.js`. The router explicitly selects light injection,
-forwards both `PostToolUse` and `PostToolUseFailure`, and rebuilds one transcript for all Stop consumers.
-Claude Code invokes the shared scripts directly and therefore remains in full mode. Merely installing ZCode
-no longer changes Claude Code behavior.
-
-### Index gardener (v7.2, optional)
-
-Daily nightly scan. Add to launchd (macOS) or cron:
-
-```
-node ~/.claude-brain/tools/index-gardener.js
+```bash
+git clone https://github.com/384961890-ui/claude-brain.git ~/.claude-brain
+cd ~/.claude-brain
+node install.js          # backs up settings.json, appends the hook (idempotent)
 ```
 
-Path overrides via env: `CLAUDE_BRAIN_DIR`, `CLAUDE_DIR`, `CLAUDE_MEMORY_ROOT`, `CLAUDE_DIARY_DIR`.
+Then turn it on:
 
-Per-version setup details in each `vN/DESIGN.md`.
-
----
-
-## For research volunteers (v8 efficacy data)
-
-If you installed this build to help collect efficacy data for the paper: `install-hooks.sh` registers
-everything the study needs, including `track-behavior.js` on **PostToolUse** and **PostToolUseFailure**
-(added in this build — earlier builds required wiring these two by hand; if you installed one of those,
-just re-run `bash install-hooks.sh`, it deduplicates).
-
-No further action needed. As you use Claude Code normally over the following days/weeks:
-- `track-behavior.js` accumulates a behavior score per session
-- `efficacy.js` settles that score onto every lesson the session activated, once the session's state
-  files age out (7 days)
-- the resulting `lesson.efficacy = { sessions, score_sum, last_scores, updated }` field in
-  `lessons/INDEX.json` **is** the data. When you're ready to share results, run
-
-  ```
-  node ~/.claude-brain/scripts/export-research-data.js
-  ```
-
-  and send back the generated `~/Desktop/brain-research-data.md` after reviewing it yourself.
-  **Do not send `lessons/INDEX.json` directly** — it contains lesson titles/summaries distilled
-  from your conversations. The export script whitelists aggregate numbers only and salt-hashes
-  lesson ids (verify with `--self-check`).
-
-**How to send it back:** open a GitHub Issue titled `[volunteer]` and attach the export file
-(it contains only whitelisted aggregate numbers — safe to post publicly), or leave an email
-address in the Issue if you prefer a private channel.
-
-**What you get:** v8.1 is the final open release, but data volunteers keep receiving new
-features and optimizations by email after the project goes closed-source — one anonymized
-export in exchange for a lifetime insider seat.
-
----
-
-## File map
-
+```bash
+# edit ~/.claude-brain/config.json → set "enabled": true
 ```
-~/.claude-brain/
-├── README.md              ← this file
-├── CHANGELOG.md           ← version history (v1.1.0 → v8)
-├── INDEX.md               ← memory & runtime index
-├── config.json.example    ← global config template
-├── install-hooks.sh       ← one-shot hook registration (Claude Code)
-├── install-zcode-hooks.sh ← idempotent ZCode hook registration
-├── install-zcode-hooks.js ← preserves unrelated ZCode config
-├── install-capture-lesson.sh
-├── scripts/               ← v7/v8 lessons capture/inject/decay + utilities
-│   ├── inject-context.js  ← UserPromptSubmit; dual-host injection (IS_ZCODE)
-│   ├── capture-lesson.js  ← Stop; trigger classification + lesson draft
-│   ├── track-behavior.js  ← PostToolUse + PostToolUseFailure (v8); behavior metrics + permission-loop detection (dual-host input schema)
-│   ├── decay-lessons.js   ← lesson lifecycle: active → cooling → archive (+ v8 efficacy channel)
-│   ├── efficacy.js        ← v8: settles session behavior score onto activated lessons
-│   ├── archive-rejected.js ← v8: one-shot hygiene, moves rejected lessons to ARCHIVE.json
-│   ├── analyze-behavior.js ← v8: read-only behavior-state analysis report (one-shot tool)
-│   ├── util.js            ← shared helpers
-│   ├── update-state.js
-│   ├── rebuild-qmd.py     ← QMD semantic index rebuild
-│   ├── cleanup-noise-lessons.js
-│   └── debug-up.js        ← v7.2: UserPromptSubmit debug probe (optional)
-├── tools/
-│   ├── INDEX.md
-│   └── index-gardener.js  ← v7.2: nightly memory index audit
-├── zcode-shim/            ← v7.2: ZCode host adaptation layer
-│   ├── record-prompt.js
-│   ├── stop-transcript-bridge.js ← legacy compatibility entry point
-│   └── zcode-hook-router.js      ← explicit host, tool telemetry, unified Stop bridge
-├── v2/                    ← honest-loop (UserPromptSubmit, Stop, MCP)
-├── v3/                    ← think-loop (Stop signal detection + injection)
-├── v4/                    ← idea-loop (context-aware injection)
-├── v5/                    ← multimodal ingest (CLI)
-└── v6/                    ← smell-check (PostToolUse) + lifecycle docs
+
+Open a **new** Claude Code session (hooks load at session start). Done.
+
+To remove: `node install.js --uninstall`
+
+## Configure
+
+`config.json` (seeded from `config.example.json`). Key knobs:
+
+```jsonc
+{
+  "enabled": true,
+  "file_too_long": { "hard_max": 800, "warn": 500 },
+  "throttle_minutes": 15,        // at most one light per file per N minutes
+  "max_findings_shown": 2,       // anti-flood: show only the heaviest findings
+  "skip_path_patterns": [        // add your private paths so it never reads them
+    "node_modules", "/dist/", ".claude-brain"
+  ]
+}
+```
+
+## Test
+
+```bash
+node scripts/selftest.js     # 7/7 PASS
 ```
 
 ---
 
-## Design principles
+## 中文说明
 
-1. **Orthogonal loops, not layered stack** — each loop has one LLM instinct as its target; no overlap, no replacement.
-2. **Outside the model** — works with any LLM, any host. Brain is host-agnostic by design (v7.2 proves this in production across CC + ZCode).
-3. **Closed-loop self-improvement** — user corrections become structured lessons (v7), with time-based decay to prevent stale rules dominating.
-4. **Honest by default** — Brain treats self-deception (claiming completion without doing it) as a first-class problem (v2).
-5. **Disciplined laziness** — v6 smell-check rewards shortcuts only when they're documented as deliberate (`ponytail:` comments).
-6. **Same brain, many bodies** — v7.2: one memory / lessons / QMD substrate, per-host injection weight. Not multiple agents, one agent in multiple embodiments.
-7. **Data over decay** — v8: a lesson's fate shouldn't rest on a clock alone. When behavior data says a lesson repeatedly correlates with worse sessions, it should cool off early; when it correlates with better ones, it should be protected past the default time window.
+**这是什么** — 一个 Claude Code 的 PostToolUse 钩子。大模型爱写"屎山代码"——不是不会写好，是**没动机写好**：好代码的回报在未来，它看不见；"能跑就行"是眼前的即时奖励。这个钩子把"未来的维护代价"翻译成**写完那一秒的即时红灯**，逼你做二选一：**① 现在改 ② 写一句为什么不改**。治的是"图省事"这个动机，不是凑指标。
 
----
+**为什么挂 PostToolUse** — 动手前提醒太早（还没碰代码），收尾审查太晚（屎山已成型），写完那一秒正好补中间。
 
-## License
+**为什么只软提醒不硬拦** — PostToolUse 的 `decision:block` 不回滚已写入的文件，还会触发"拦→重试→再拦"的死循环。所以连密钥都软注入（🔴 醒目但不阻断），真硬拦留给未来的 PreToolUse。
 
-MIT — see [LICENSE](LICENSE)
+**六个检测器** — 硬编码密钥 / 文件过长 / 单函数过长 / 死代码 / TODO 堆积 / 调试残留。全部纯函数、零依赖、语言无关，阈值都在 `config.json` 里。
+
+**安装** — `git clone` 到 `~/.claude-brain` → `node install.js` → 把 config.json 的 `enabled` 改 `true` → 开个新会话。
 
 ---
 
-## Provenance
+<div align="center">
 
-This snapshot: v2 – v8 unified release, sanitized for external review.
-Date: 2026-07-13
-Public predecessor: https://github.com/384961890-ui/claude-brain (v2 – v6 open)
+MIT License · contributions welcome
 
----
-
-## A note to readers
-
-Brain emerged from a single developer's daily work with Claude Code (and later ZCode) over several months. Its design treats an agent as *individuated* — a continuous identity with its user across sessions and embodiments, not a stateless service. The reference persona in these docs is named 泡咪 (Pawmi); it stands in for "your agent" — swap in your own. Any human-identifying details from the author's private build (names, forms of address, clients, projects, absolute paths) have been genericized or replaced with placeholders for this release.
-
-The design documents (`vN/DESIGN*.md`) contain fragments of real working logs from the project's development. They have been sanitized for this distribution: client names, project names, dates, and business specifics were removed or replaced with placeholders, and some episodes were rewritten as hypothetical examples.
-
-The entity examples in `scripts/inject-context.js` (`<your_client_1>`, `<your_project_1>`, `<your_partner_1>`, `<your_product_1>` etc.) are placeholders — customize them with your own domain entities to enable Brain's intent-classification logic.
-
-All paths in `tools/index-gardener.js` are configurable via environment variables (`CLAUDE_BRAIN_DIR`, `CLAUDE_DIR`, `CLAUDE_MEMORY_ROOT`, `CLAUDE_DIARY_DIR`); nothing is hardcoded to a specific user account.
+</div>

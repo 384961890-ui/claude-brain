@@ -1,0 +1,28 @@
+<svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+  <!-- terminal window -->
+  <rect width="760" height="360" rx="12" fill="#1E1E1A"/>
+  <!-- title bar -->
+  <rect width="760" height="38" rx="12" fill="#2A2A24"/>
+  <rect y="20" width="760" height="18" fill="#2A2A24"/>
+  <circle cx="26" cy="19" r="6" fill="#FF5F56"/>
+  <circle cx="48" cy="19" r="6" fill="#FFBD2E"/>
+  <circle cx="70" cy="19" r="6" fill="#27C93F"/>
+  <text x="380" y="24" font-size="12" fill="#7C766B" text-anchor="middle">Claude Code — you just wrote auth.js</text>
+
+  <!-- body: a real red-light output -->
+  <text x="28" y="78" font-size="14" font-weight="700" fill="#E0936E">🚩 Shitcode Red-Light · ~/src/auth.js</text>
+
+  <text x="28" y="118" font-size="13" fill="#E8E3D8">1. Line 2 looks like a hardcoded credential literal</text>
+  <text x="48" y="142" font-size="12.5" fill="#FF6B5C">🔴 A secret in code = a secret in git history,</text>
+  <text x="68" y="162" font-size="12.5" fill="#FF6B5C">impossible to fully scrub. Pick one:</text>
+  <text x="68" y="184" font-size="12.5" fill="#E8E3D8">(1) real secret → move it to env vars now</text>
+  <text x="68" y="204" font-size="12.5" fill="#E8E3D8">(2) placeholder/example → skip this</text>
+
+  <text x="28" y="240" font-size="13" fill="#E8E3D8">2. This file is now 840 lines (over the 800-line limit)</text>
+  <text x="48" y="264" font-size="12.5" fill="#C9C3B6">840 lines. (1) split it now (2) write one line on</text>
+  <text x="68" y="284" font-size="12.5" fill="#C9C3B6">why this file has to be this big.</text>
+
+  <line x1="28" y1="308" x2="732" y2="308" stroke="#3A3A32" stroke-width="1"/>
+  <text x="28" y="332" font-size="12" fill="#7C766B">— This light doesn't block you. It just keeps you from</text>
+  <text x="28" y="350" font-size="12" fill="#7C766B">cutting a corner silently.</text>
+</svg>

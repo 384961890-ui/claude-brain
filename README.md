@@ -1,8 +1,14 @@
+<div align="center">
+
+<img src="assets/poster.png" alt="Claude Brain" width="760"/>
+
 # Claude Brain · 完整版 v2–v6
 
 > **让 Claude Code 每次启动都"记得自己是谁"**，顺便帮你盯着代码质量、夜里自主巡检项目。
 >
 > 零 npm 依赖 · 纯 Node + Python 标准库 · 挂 Claude Code Hook 即用
+
+</div>
 
 ---
 

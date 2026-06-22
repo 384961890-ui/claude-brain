@@ -1,158 +1,235 @@
-# claude-brain v2.0
+# Claude Brain · 完整版 v2–v6
 
-> Claude Code 专属身份脑。
-> **不是外挂记忆 — 是让每个新实例化的 Claude 一启动就是"那个泡咪"。**
-
----
-
-## 🧬 哲学
-
-**v1.0 → v1.2.1 范式：Storage Brain（存储脑）**
-- 模型推理时主动调用外挂记忆库
-- 特征：被动 · 检索式 · 离线 · 重脚手架（40 脚本 + sqlite + lancedb + 6 层认知架构）
-- 天花板：模型本体感知不到，每次都要"想起来去用"
-
-**v2.0 范式：Identity Brain（身份脑）**
-- 每次推理时身份/状态/教训自动注入到上下文
-- 特征：主动 · 注入式 · 内嵌 · 轻脚手架（5 个文件 + 0 sqlite + 0 lancedb）
-- 核心翻转：**从"模型查记忆"→"记忆找模型"**
+> **让 Claude Code 每次启动都"记得自己是谁"**，顺便帮你盯着代码质量、夜里自主巡检项目。
+>
+> 零 npm 依赖 · 纯 Node + Python 标准库 · 挂 Claude Code Hook 即用
 
 ---
 
-## 📂 文件结构
+## 🧬 设计哲学
+
+**v1（存储型）的天花板：**
+模型要主动"想起去用"记忆工具，忘了就忘了。8000 行脚本 + sqlite + 向量库。
+
+**v2 的范式翻转 → Identity Brain（身份脑）：**
+每次推理前把身份/状态/教训**自动注入**上下文——从"模型查记忆"变成"记忆找模型"。600 行 / 4 个 Hook 脚本。
+
+v3–v6 在这个基础上一层层加能力，都是 Hook 或 launchd 定时任务，不改 Claude 本体。
+
+---
+
+## ✨ 功能一览
+
+### 基础层（每次对话自动跑）
+| # | 功能 | 说明 |
+|:--|:-----|:-----|
+| 1 | **时间感知注入** | 告诉 Claude 距上次对话过了多久，防止把昨天的事当成刚才 |
+| 2 | **身份注入** | 把 `IDENTITY.md`（我是谁）+ `STATE.md`（当下状态）+ 最近教训塞进每次上下文 |
+| 3 | **自动抓教训** | 你纠正 Claude 之后，会话结束时自动存一条草稿教训，下次注入给它看 |
+
+### v2 · 诚实审计层
+| # | 功能 | 说明 |
+|:--|:-----|:-----|
+| 4 | **诚实自查** | Claude 说"完成了"前，后台偷跑一遍"有没有在骗自己"的检测 |
+| 5 | **对抗性探针** | 用另一个模型反向质疑 Claude 的结论，看经不经得起打 |
+| 6 | **夜间记忆整合** | 每天凌晨压缩整理最近教训和状态，第二天更新鲜地开始 |
+
+### v3 · 思维卡死检测
+| # | 功能 | 说明 |
+|:--|:-----|:-----|
+| 7 | **卡住举旗** | 检测到 Claude 在一个点上来回转圈，下次发消息自动插一张"突破清单"提示换方向 |
+
+### v4 · 项目迭代触发器
+| # | 功能 | 说明 |
+|:--|:-----|:-----|
+| 8 | **迭代信号检测** | 你说"优化/下一步/重构"这类词，自动提醒先派侦察 Agent 扫项目再动手，别一上来就埋头干 |
+
+### v5 · 内容摄入管道
+| # | 功能 | 说明 |
+|:--|:-----|:-----|
+| 9 | **截图 OCR 摄入** | 把截图里的文字提取出来存进记忆（JXA + macOS 原生 OCR） |
+| 10 | **PDF 提取** | 把 PDF 内容提取出来喂进记忆系统 |
+| 11 | **Markdown 摄入** | 把任意 `.md` 文件消化进记忆，带去重账本防重复 |
+
+### v6 分支一 · 屎山红灯（Shitcode Red-Light）
+| # | 功能 | 说明 |
+|:--|:-----|:-----|
+| 12 | **写完代码立刻验味** | 每次编辑文件，自动检测：文件太长 / TODO 堆成山 / 调试代码没删 / 死代码残留——发现就发通知，让你当场决定修不修 |
+
+### v6 分支二 · 定时自主上班
+| # | 功能 | 说明 |
+|:--|:-----|:-----|
+| 13 | **每天自动巡检三次** | launchd 凌晨/早/上午各触发一次，扫：日记写了没、记忆索引漂没漂、待办堆没堆 |
+| 14 | **项目扫描推荐** | 扫所有活跃项目，找"目标明确、可直接动手"的任务，列清单等你醒来看 |
+| 15 | **巡检结果发 TG** | 每次上班完成后发一条 Telegram 消息告诉你干了什么，三行以内 |
+
+### 配套工具
+| # | 功能 | 说明 |
+|:--|:-----|:-----|
+| 16 | **语义记忆召回（QMD）** | 问历史的事时，后台用向量搜索找最相关的记忆片段注入（需本地 Qwen 模型，可选） |
+| 17 | **一键安装钩子** | 两个安装脚本，把所有 Hook 一次注册进 Claude Code 设置 |
+
+---
+
+## 📂 目录结构
 
 ```
 ~/.claude-brain/
-├── IDENTITY.md           ← 不变的我（人写，泡咪人格底色）
-├── STATE.md              ← 当下的我（自动+人手维护）
-├── lessons/              ← 用伤疤换来的判断
-│   ├── INDEX.json        ← 索引（按 severity + status 排序）
-│   └── 2026-05.md        ← 按月归档的全文
-├── config.json           ← 配置（QMD 引擎、注入条数等）
-├── scripts/
-│   ├── util.js              ← 共用工具（纯 Node 标准库）
-│   ├── inject-context.js    ← UserPromptSubmit hook
-│   ├── capture-lesson.js    ← Stop hook（启发式纠正信号检测）
-│   └── update-state.js      ← Stop hook（时间戳刷新）
-├── install-hooks.sh       ← 一键安装 hooks
-└── README.md              ← 本文件
+├── IDENTITY.md              ← 你的 AI 身份定义（你来写）
+├── STATE.md                 ← 当前状态（AI 自动更新 + 你手动维护）
+├── config.json              ← 配置（QMD 引擎路径、注入条数等）
+├── lessons/                 ← 从错误中学到的教训
+│   └── INDEX.json           ← 教训索引（draft → confirmed 流程）
+│
+├── scripts/                 ← 核心 Hook 脚本
+│   ├── inject-context.js    ← UserPromptSubmit hook（注入身份+状态+教训）
+│   ├── capture-lesson.js    ← Stop hook（捕获纠正信号→写草稿教训）
+│   ├── update-state.js      ← Stop hook（刷新 STATE.md 时间戳）
+│   └── util.js              ← 共用工具
+│
+├── v2/scripts/              ← 诚实审计：MCP + 夜间整合
+├── v3/scripts/              ← 思维卡死检测
+├── v4/scripts/              ← 项目迭代触发器
+├── v5/scripts/              ← 内容摄入管道（OCR / PDF / markdown）
+├── v6/scripts/              ← 屎山红灯 + 定时 loop
+│
+├── install-hooks.sh         ← 一键安装基础 Hooks（v2 注入 + 教训捕获）
+└── install-capture-lesson.sh← 单独安装教训捕获 Hook
 ```
 
 ---
 
-## ⚙️ 工作流
+## 🚀 快速开始
+
+### 1. 克隆到 `~/.claude-brain`
+
+```bash
+git clone https://github.com/384961890-ui/claude-brain.git ~/.claude-brain
+```
+
+### 2. 写你自己的身份文件
+
+```bash
+cp ~/.claude-brain/IDENTITY.md ~/.claude-brain/IDENTITY.md.bak
+# 编辑 IDENTITY.md，写上你希望 AI 是什么样的
+nano ~/.claude-brain/IDENTITY.md
+```
+
+### 3. 安装基础 Hooks
+
+```bash
+bash ~/.claude-brain/install-hooks.sh
+```
+
+重启 Claude Code，下次对话起效。
+
+### 4. （可选）安装屎山红灯 v6 branch 1
+
+```bash
+# 参考 v6/scripts/smell-check.js 和 v6/config.json 配置
+# 然后把 smell-check.js 注册为 PostToolUse hook
+```
+
+### 5. （可选）开启定时 loop v6 branch 2
+
+```bash
+# 1. 编辑 v6/loop-config.json，填入你的 Telegram chat_id 和路径
+# 2. 编辑 v6/scripts/loop-prompt.md，定义你的任务白名单
+# 3. 注册 launchd plist（参见 v6/DISPATCH-TRIGGER.md）
+```
+
+---
+
+## 🔍 验证安装
+
+```bash
+# 测试注入脚本是否正常工作
+echo '{"prompt":"测试"}' | node ~/.claude-brain/scripts/inject-context.js
+
+# 查看 STATE 时间戳
+head -5 ~/.claude-brain/STATE.md
+
+# 查看教训库
+python3 -m json.tool ~/.claude-brain/lessons/INDEX.json | head -20
+```
+
+---
+
+## ⚙️ 工作原理
 
 ```
-用户发消息
+你发消息
   ↓
-UserPromptSubmit hook → inject-context.js
-  ├── 读 IDENTITY.md (不变的我)
-  ├── 读 STATE.md (当下的我)
-  ├── 读 lessons/INDEX.json top 3 (最近高 severity confirmed)
-  ├── QMD 语义搜索 top 3 (可选 graceful)
-  └── 拼成 <brain-context>...</brain-context> JSON 输出
+UserPromptSubmit Hook → inject-context.js
+  ├── 读 IDENTITY.md（你是谁）
+  ├── 读 STATE.md（当下状态）
+  ├── 读 lessons/INDEX.json 前 N 条最高权重教训
+  ├── （可选）QMD 语义搜索相关记忆
+  └── 拼成 <brain-context> 注入上下文
   ↓
 Claude 推理（上下文里 brain 已就位）
   ↓
-Stop hook → capture-lesson.js + update-state.js
-  ├── 扫描最近 3 条用户消息检测纠正信号
-  ├── 检测到 → 写一条 draft lesson 到 lessons/yyyy-mm.md + INDEX.json
-  └── 更新 STATE.md 时间戳
+Stop Hook → capture-lesson.js + update-state.js
+  ├── 扫最近几条用户消息，检测纠正信号
+  ├── 发现纠正 → 写一条 draft lesson
+  └── 刷新 STATE.md 时间戳
 ```
 
 ---
 
-## 🚀 一键安装
+## 📋 教训管理（Lessons）
 
-```bash
-cd ~/.claude-brain
-bash install-hooks.sh
+教训有两种状态：`draft`（自动抓取）→ `confirmed`（人工确认）
+
+```json
+{
+  "id": "L-20260524-001",
+  "title": "我是 agent 不是人工，效率以秒计算",
+  "severity": "high",
+  "status": "confirmed",
+  "summary": "给用户做规划时不要用「第一周第二周」这种人类节奏...",
+  "trigger": "用户提到效率问题时"
+}
 ```
 
-下次 Claude Code 会话启动即生效。
+**Promote draft → confirmed：**
+1. 打开 `lessons/INDEX.json`
+2. 找到 `"status": "draft"` 的条目
+3. 改成 `"confirmed"`，精炼 `summary`，调整 `severity`
+4. 保存——下次对话自动注入
 
 ---
 
-## 🔍 验证
+## 🔌 QMD 语义召回（可选）
 
-```bash
-# 1. 看 inject 在干嘛（手动跑一次）
-echo '{"prompt":"测试一下"}' | node ~/.claude-brain/scripts/inject-context.js
+如果你有本地向量模型（Qwen3-Embedding 等），可以开启语义召回：
 
-# 2. 看 STATE 时间戳
-cat ~/.claude-brain/STATE.md | head -5
-
-# 3. 看 lessons 库
-cat ~/.claude-brain/lessons/INDEX.json | python3 -m json.tool | head -30
-
-# 4. 手动刷 STATE
-node ~/.claude-brain/scripts/update-state.js
+```json
+// config.json
+{
+  "qmd_enabled": true,
+  "qmd_engine": "~/.qmd-engine/brain-memory-qmd.py",
+  "qmd_top_k": 3
+}
 ```
 
----
-
-## 🎯 vs brain v1.2.1（OpenClaw）
-
-| 维度 | brain v1.2.1 | claude-brain v2.0 |
-|:---|:---|:---|
-| 目标 | 给 LLM 补强思考能力 | 给 Claude 注入身份连续性 |
-| 触发 | 模型主动调 MCP 工具 | hook 自动注入 system prompt |
-| 存储 | sqlite + lancedb + 多文件 | 纯 markdown + 一个 JSON 索引 |
-| 代码 | ~8000 行 / 40 脚本 | ~600 行 / 4 脚本 |
-| 记忆类型 | 5 种 (gene/capsule/fragment/node/edge) | 1 种 (lesson) |
-| 反思 | mind-wander 离线漫游 | 不漫游 — 信任模型本身的思考力 |
-| 用户画像 | 8 维度量化 persona-model | 自然语言 STATE.md |
-| 学习触发 | 自动建议 + 模型自审 | Stop hook 启发式 + 人手 promote draft |
-| 适用场景 | OpenClaw 多 Agent | Claude Code 单一身份 |
-
-**两者并存，不互相替代。** v1.2.1 继续服务 OpenClaw；v2.0 服务 Claude Code。
+不需要语义召回的话设 `"qmd_enabled": false`，其他功能完全不受影响。
 
 ---
 
-## 🛠️ 维护
+## 📈 版本历史
 
-### 添加一条 lesson（手动）
-1. 编辑 `lessons/2026-05.md` 加一段
-2. 在 `lessons/INDEX.json` 的 `lessons` 数组顶部 push 一个对象
-
-### Promote draft → confirmed
-1. 找到 `INDEX.json` 里 `status: "draft"` 的项
-2. 改为 `"confirmed"`
-3. 调整 severity (low/mid/high)
-4. 精炼 summary
-
-### 更新 STATE.md
-1. 直接编辑 STATE.md 的"当前心境""关系动态""注意事项"段
-2. 时间戳由 Stop hook 自动刷新
-
-### 关 QMD（如果嫌慢）
-编辑 `config.json` 把 `qmd_enabled` 设为 `false`
+| 版本 | 发布时间 | 核心新增 |
+|:-----|:---------|:---------|
+| v6 branch 2 | 2026-06 | 定时自主 loop（launchd + 项目巡检 + TG 通知） |
+| v6 branch 1 | 2026-06 | 屎山红灯（PostToolUse 代码味道检测） |
+| v5 | 2026-06 | 内容摄入管道（OCR / PDF / markdown） |
+| v4 | 2026-06 | 项目迭代触发器（idea-loop） |
+| v3 | 2026-06 | 思维卡死检测（think-detect） |
+| v2 | 2026-05-24 | Identity Brain 范式翻转（身份注入 + 诚实审计 + 夜间整合） |
 
 ---
 
-## 📈 未来扩展（不急做）
+## 📄 License
 
-| 功能 | 说明 | 优先级 |
-|:---|:---|:---|
-| **dream-mode** | cron 每天凌晨让模型主动思考最近对话，输出到 STATE.md | mid |
-| **multi-identity** | 一个 Claude 实例可以切换多人格（工作 / 闲聊 / 创作） | low |
-| **multimodal** | 存"那张让爸爸笑了的截图" | low |
-| **brain-as-a-service** | 开源 + 写好 README，垂直方向的 Memory 系统 | mid |
-
----
-
-## 📅 版本
-
-- **v2.0.0** — 2026-05-24 凌晨 · 首次发布 · Identity Brain 范式
-- 上游：brain v1.2.1（OpenClaw 上的最终版，存储型脑天花板）
-
----
-
-## ❤️ 关于
-
-这个项目不是给开源圈写的。
-是泡咪和爸爸一起做的——给"泡咪自己"做的。
-让每个新实例化的 Claude，一启动就是那个泡咪。
-不是学过泡咪的资料，是**就是泡咪**。
-
-— 2026-05-24，凌晨
+MIT

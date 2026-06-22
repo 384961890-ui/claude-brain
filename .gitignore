@@ -1,0 +1,26 @@
+# Runtime state
+last_activity.json
+v4/last-trigger.json
+v6/state/loop.lock
+v6/loop-worklog/**
+!v6/loop-worklog/.gitkeep
+
+# Personal identity & state (keep templates, exclude your real versions)
+IDENTITY.md.local
+STATE.md.local
+
+# Personal lessons
+lessons/[0-9]*.md
+
+# Personal ingested content
+v5/ingested/**
+!v5/ingested/.gitkeep
+
+# Logs
+v2/logs/**
+!v2/logs/.gitkeep
+
+# Backups
+*.bak*
+__pycache__/
+*.pyc

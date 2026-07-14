@@ -2,14 +2,28 @@
 
 <img src="assets/poster-v8.1.png" alt="Claude Brain" width="820"/>
 
+# Claude Brain · v2 – v8.1
+
+**给 AI agent 装的运行时大脑:治模型的坏习惯、跨会话保住身份、从你的纠正里自己长记性。**
+
+*Runtime cognitive substrate for AI agents — disciplines trained-in LLM instincts,
+preserves agent identity across sessions and hosts, self-improves from real user corrections.*
+
+在 Claude Code 与 ZCode 双宿主生产环境连续运行 4 个月 · 纯 Node stdlib 零外部依赖 · MIT
+
+**觉得这套思路有点东西?给个 ⭐ —— 对一个即将定格的开源项目 star 就是它的墓志铭和勋章。**
+
 </div>
 
-# Claude Brain — v2 to v8.1
+---
 
-> **Runtime cognitive substrate for AI agents** — more than their base model.
-> Disciplines trained-in LLM instincts, preserves agent individuation across sessions and embodiments, self-improves from real user corrections.
+## 📌 关于这个版本(先读这段)
 
-中文:Brain 是 agent 的 runtime 类脑基质 —— 让它不只是底层模型的另一个实例。治模型训练带来的本能、跨会话和跨载体保持身份、从真实用户纠正中自进化。
+**v8.1 是 Brain 的最后一个开源版本。** 从下一版起 Brain 转为我们产品的底层引擎,涉及商业内核,不再公开。三件事说清楚:
+
+1. **仓库不会关。** v8.1 全部代码 + 七个版本的设计文档永久留在这里。MIT,随便用、随便改、随便拆。
+2. **你拿到的是完整引擎,不是完整大脑。** 七条正交回路的代码一行没删;剥掉的是我们生产环境的记忆库、身份层和四个月磨出来的调校数据 —— 那部分是护城河。即便如此,它也比市面上大多数"炒作项目"好用那么一点点 🤏
+3. **帮我们跑数据的开发者有终身通道。** 装了 v8.1 并交回过研究数据(见 [research volunteers](#for-research-volunteers-v8-efficacy-data) 段)的开发者,闭源后的新功能、新优化会持续通过邮件单独发给你 —— 一份匿名的聚合数据,换一个终身内测位。报名方式:开一个 GitHub Issue 标 `[volunteer]`,或交数据时留下邮箱。
 
 ---
 
@@ -119,6 +133,14 @@ No further action needed. As you use Claude Code normally over the following day
   **Do not send `lessons/INDEX.json` directly** — it contains lesson titles/summaries distilled
   from your conversations. The export script whitelists aggregate numbers only and salt-hashes
   lesson ids (verify with `--self-check`).
+
+**How to send it back:** open a GitHub Issue titled `[volunteer]` and attach the export file
+(it contains only whitelisted aggregate numbers — safe to post publicly), or leave an email
+address in the Issue if you prefer a private channel.
+
+**What you get:** v8.1 is the final open release, but data volunteers keep receiving new
+features and optimizations by email after the project goes closed-source — one anonymized
+export in exchange for a lifetime insider seat.
 
 ---
 

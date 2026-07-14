@@ -1,0 +1,30 @@
+# Runtime data (per-session, never commit)
+state/
+lessons/
+data/
+logs/
+ingested/
+loop-worklog/
+streams/
+archive/
+sessions/
+last_activity.json
+last-trigger.json
+debug.log
+zcode_up_debug.log
+
+# Dev backups
+*.bak
+*.bak-*
+*.tmp
+*~
+
+# OS / IDE
+.DS_Store
+__pycache__/
+*.pyc
+node_modules/
+
+# Personal config (use *.example as template)
+config.json
+loop-config.json

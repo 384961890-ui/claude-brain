@@ -55,7 +55,7 @@ a graph you do not own.
 | **`memory-spec/`** | The structured-memory standard: three-layer index tree, dual-section records (current conclusion + append-only history = a file-native temporal knowledge graph), six memory types, wikilink graph layer, write-time gate, nightly gardener. Templates and four runnable scripts. |
 | **`qmd-engine/`** | Local semantic retrieval: embedding recall + reranker, resident daemon, atomic index rebuild, health checks. Off-the-shelf open models (Qwen3-Embedding-4B, Qwen3-Reranker-0.6B) — we trained nothing; we engineered everything around them. `PITFALLS.md` documents the incidents that paid for that engineering. |
 | **Core loops** (`v2`–`v6`, in the main repository) | Hook-based orthogonal loops that discipline LLM instincts: honesty checks, stuck-detection, idea triage, slop lights. Each loop targets one instinct; none replaces another. |
-| **`main-repo-updates/`** | The v8.3 update to the injection pipeline (merges into the main repository's `scripts/`): intent-routed tiered retrieval (grep floor → embedding → reranker) and **graph-aware recall** — one-hop `[[wikilink]]` expansion at retrieval time, hard-capped. See its README for the merge map. |
+| **Pipeline** (`scripts/`) | Intent-routed tiered retrieval (grep floor → embedding → reranker) and **graph-aware recall** — one-hop `[[wikilink]]` expansion at retrieval time, hard-capped. Merged into the main repository's hook pipeline. |
 
 ## What this is not · 这不是什么
 

@@ -14,13 +14,17 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const {
-  BRAIN_DIR, loadConfig, readFileSafe, writeFileAtomic, loadLessons, markLessonsActivated, qmdSearch, debugLog
+  BRAIN_DIR, loadConfig, readFileSafe, writeFileAtomic, loadLessons, markLessonsActivated, qmdSearch, grepFloor, debugLog
 } = require('./util.js');
 
 // 宿主必须由适配层显式声明。安装了 ZCode 不等于当前进程跑在 ZCode。
 const IS_ZCODE = process.env.CLAUDE_BRAIN_HOST === 'zcode';
 
 const config = loadConfig();
+
+// 一跳 [[链接]] 展开（2026-07-22 接入）：召回条目命中的文件里引用的 [[slug]] 顺手带出摘要
+let expandLinks = (recall) => recall;
+try { ({ expandLinks } = require('./link-expand.js')); } catch (e) { debugLog(config, 'link-expand module not loaded:', e.message); }
 
 // ── v4 idea-loop 触发器（2026-06-09 接入）──────────────────────────────
 let buildIdeaLoopBlock = () => '';
@@ -98,7 +102,7 @@ function buildPlanningBlock(userPrompt, isZCode = false) {
 }
 
 // ============================================================
-// 时间感知 — 让泡咪知道距上次对话过了多久 + 当前是什么时段
+// 时间感知 — 让 agent 知道距上次对话过了多久 + 当前是什么时段
 // ============================================================
 
 const LAST_ACTIVITY_PATH = path.join(BRAIN_DIR, 'last_activity.json');
@@ -128,7 +132,7 @@ function inferGap(ms) {
 
 function inferTimeOfDay(date) {
   const h = date.getHours();
-  if (h < 5) return '深夜/凌晨（用户熬夜中？还是意外醒？）';
+  if (h < 5) return '深夜/凌晨';
   if (h < 9) return '清晨（刚起床）';
   if (h < 12) return '上午（工作时段）';
   if (h < 14) return '午饭时段';
@@ -221,9 +225,9 @@ function buildDiaryBlock(intent) {
 
 // 顺序很重要 — 上面的优先匹配
 // v3 路由调整（2026-06-08）：historical_deep 优先级提到 entity_specific 之前
-//   场景："<your_client_1> 之前那次说什么" 既含实体又含历史信号 — 应走 L3 精排（reranker），
+//   场景："acme-corp 之前那次说什么" 既含实体又含历史信号 — 应走 L3 精排（reranker），
 //   不能被 entity_specific 截胡走 L2 fast。
-//   解决：把 historical_deep 上提；entity_specific 留作"光提实体没历史信号"的兜底（如"<your_client_1> 现在怎么样了"）。
+//   解决：把 historical_deep 上提；entity_specific 留作"光提实体没历史信号"的兜底（如"acme-corp 现在怎么样了"）。
 const INTENT_RULES = [
   {
     name: 'explicit_file',
@@ -232,15 +236,15 @@ const INTENT_RULES = [
   },
   {
     name: 'historical_deep',
-    patterns: [/(?:之前|上次|上回|历史|曾经|过去|那次|那时候)/, /(?:我做过|我说过|用户说过)/, /(?:去年|上个?月|上周)/],
+    patterns: [/(?:之前|上次|上回|历史|曾经|过去|那次|那时候)/, /(?:我做过|我说过|你说过)/, /(?:去年|上个?月|上周)/],
     config: { skip_qmd: false, qmd_top_k: 5, lessons_count: 3, qmd_endpoint: '/search', reason: '查历史 — L3 reranker 精排 + 多 lessons' }
   },
   {
     name: 'entity_specific',
+    // example entity list — replace with the people/projects/codenames YOUR agent
+    // actually talks about; these route entity mentions to a deeper recall tier
     patterns: [
-      // 部署时把 <your_*> 换成自己关心的实体名（客户、项目、伙伴等）以启用意图分类
-      /(?:your_client_1|your_client_2|your_project_1|your_project_2|your_partner_1|claude-brain|brain v1\.)/i,
-      /(?:your_product_1|your_product_2|your_product_3)/,
+      /(?:acme-corp|project-nimbus|claude-brain|brain v1\.)/i,
     ],
     config: { skip_qmd: false, qmd_top_k: 5, lessons_count: 2, reason: '提到实体（无历史信号）— L2 fast + path-boost' }
   },
@@ -289,29 +293,34 @@ let stdinData = '';
 process.stdin.setEncoding('utf-8');
 process.stdin.on('data', c => stdinData += c);
 process.stdin.on('end', () => {
-  try {
-    const input = stdinData.trim() ? JSON.parse(stdinData) : {};
-    const userPrompt = (input.prompt || input.user_prompt || '').toString();
-    const context = buildContext(userPrompt, input);
-    // Claude Code UserPromptSubmit hook 接受 JSON 输出
-    process.stdout.write(JSON.stringify({
-      decision: 'approve',
-      additionalContext: context
-    }));
-  } catch (e) {
-    debugLog(config, 'inject-context error:', e.message);
-    // 静默成功 — 不阻塞用户
-    process.stdout.write('');
-  }
-  process.exit(0);
+  // qmdSearch 改走 Node http 模块后是异步的（2026-07-22），buildContext 里 await 它，
+  // 所以这里也要等 — 包一层 async IIFE，出口逻辑（写一次 stdout 再 exit）不变。
+  (async () => {
+    try {
+      const input = stdinData.trim() ? JSON.parse(stdinData) : {};
+      const userPrompt = (input.prompt || input.user_prompt || '').toString();
+      const context = await buildContext(userPrompt, input);
+      // Claude Code UserPromptSubmit hook 接受 JSON 输出
+      process.stdout.write(JSON.stringify({
+        decision: 'approve',
+        additionalContext: context
+      }));
+    } catch (e) {
+      debugLog(config, 'inject-context error:', e.message);
+      // 静默成功 — 不阻塞用户
+      process.stdout.write('');
+    }
+    process.exit(0);
+  })();
 });
 
-function buildContext(userPrompt, input = {}) {
+async function buildContext(userPrompt, input = {}) {
   // 1. 检测 intent — 决定本次注入的"重量"
   const intent = detectIntent(userPrompt);
   debugLog(config, `intent: ${intent.name} (${intent.reason}) ${IS_ZCODE ? '[ZCode 轻量化]' : ''}`);
 
-  const identity = readFileSafe(path.join(BRAIN_DIR, 'IDENTITY.md'));
+  // IDENTITY.md 复述已下线（2026-06-16 去重，CLAUDE.md 灵魂段为唯一正本），
+  // 之前这里还留着一次白读 IDENTITY.md（读了从没用过）—— 2026-07-22 一并删掉。
   const state = readFileSafe(path.join(BRAIN_DIR, 'STATE.md'));
 
   // 2. lessons — 数量按 intent 控制
@@ -327,7 +336,9 @@ function buildContext(userPrompt, input = {}) {
   //   state/activated-<sid>.json 记本 session 已激活过的 id 集合
   if (lessons.length > 0) {
     try {
-      const sid = input.session_id || 'unknown';
+      // c4 (2026-07-22): session_id 来自宿主传入的 stdin JSON，宿主半可信但不是零信任 —
+      // 不消毒直接拼路径，含 '/' 或 '..' 的 sid 能穿出 state/ 目录。白名单只留 [A-Za-z0-9_-]。
+      const sid = (input.session_id || 'unknown').toString().replace(/[^\w-]/g, '_');
       const seenPath = path.join(BRAIN_DIR, 'state', `activated-${sid}.json`);
       let seen = new Set();
       try { seen = new Set(JSON.parse(fs.readFileSync(seenPath, 'utf-8'))); } catch {}
@@ -342,14 +353,32 @@ function buildContext(userPrompt, input = {}) {
     }
   }
 
-  // 3. QMD 召回 — 按 intent 决定是否调，并选择层级
-  //    默认走 L2 /search_fast (warm ~1.5s)，historical_deep 走 L3 /search (reranker 精排)
+  // 3. 召回 — 按 intent 决定是否调，并选择层级
+  //    default intent（六条正则都没命中的兜底）先试 grep 免费地板（7/20 加入）：
+  //    整句字面量命中 MEMORY.md / lessons/INDEX.json 就用，省一次 embedding；不命中原样落回 QMD。
+  //    其余 intent 不碰 grep，行为跟改动前一致：默认走 L2 /search_fast (warm ~1.5s)，
+  //    historical_deep 走 L3 /search (reranker 精排)。
   let recall = [];
+  let recallSource = 'qmd';
   if (!intent.skip_qmd && userPrompt.length >= 6 && config.qmd_enabled) {
-    const localConfig = { ...config };
-    if (intent.qmd_top_k) localConfig.qmd_top_k = intent.qmd_top_k;
-    recall = qmdSearch(userPrompt, localConfig, intent.qmd_endpoint);
+    let floorHit = false;
+    if (intent.name === 'default') {
+      const floor = grepFloor(userPrompt, config);
+      if (floor.hit) {
+        recall = floor.snippets;
+        recallSource = 'grep-floor';
+        floorHit = true;
+      }
+    }
+    if (!floorHit) {
+      const localConfig = { ...config };
+      if (intent.qmd_top_k) localConfig.qmd_top_k = intent.qmd_top_k;
+      recall = await qmdSearch(userPrompt, localConfig, intent.qmd_endpoint);
+    }
   }
+  debugLog(config, `recall: source=${recallSource} count=${recall.length}`);
+  // 一跳链接展开：给召回条目附加它命中文件里引用的 [[slug]] 摘要（config.link_expansion_enabled 默认 true）
+  try { recall = expandLinks(recall, config); } catch (e) { debugLog(config, 'expandLinks error:', e.message); }
 
   // 4. tools/INDEX.md — 仅在 tool_skill_query intent 时注入
   let toolsIndex = '';
@@ -386,33 +415,44 @@ function buildContext(userPrompt, input = {}) {
   parts.push('');
 
   // 宿主标识 - 写日记/报告时盖的章（双宿主区分）
-  parts.push(`> 📍 当前宿主：${IS_ZCODE ? 'ZCode' : 'CC'} · 写日记/报告时在最前面标注 [${IS_ZCODE ? 'ZCode泡咪写' : 'CC泡咪写'}]`);
+  parts.push(`> 📍 当前宿主：${IS_ZCODE ? 'ZCode' : 'CC'} · 写日志/报告时标注宿主`);
   parts.push('');
 
   // IDENTITY 身份复述已下线（2026-06-16 去重）— CLAUDE.md 灵魂段为唯一正本；
   // brain 独占内容（碳基/硅基框架·盾牌比喻·人机开关）已先迁入 CLAUDE.md「我怎么想」。
-  // 把 false 改回 identity 即可一键恢复；TIME AWARENESS / STATE / LESSONS 均不受影响。
-  if (false && identity) {
-    parts.push('---');
-    parts.push('## 🪪 IDENTITY（不变的我）');
-    parts.push('');
-    parts.push(identity.trim());
-    parts.push('');
-  }
+  // c2 (2026-07-22): 之前这里留了个 `if (false && identity)` 死代码块（连带一次白读
+  // IDENTITY.md）当"一键恢复开关"——发布件里不该带永远走不到的分支，真要恢复从 git 历史翻。
 
-  if (state) {
+  // 7/20: 心境时效折叠 — 超 7 天的心境段不再全文注入（陈货心境比没有更糟：每天醒来被塞一个月前的心情）
+  const foldStaleMood = (text) => text.replace(
+    /## 当前心境（([^）]*)）[\s\S]*?(?=\n## |\n---|$)/g,
+    (block, dateStr) => {
+      const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+      const days = m ? Math.floor((Date.now() - new Date(m[0]).getTime()) / 86400000) : Infinity;
+      if (days <= 7) return block;
+      const label = m ? `最后写于 ${m[0]} 已停更 ${days} 天` : `标题无完整日期（${dateStr}）视为过期`;
+      return `## 当前心境\n\n（${label} — 当下心境以近几日日记为准 该更新 STATE 了）\n`;
+    }
+  );
+  const state2 = state ? foldStaleMood(state) : state;
+
+  if (state2) {
     parts.push('---');
     parts.push('## 📍 STATE');
     parts.push('');
     // ZCode 轻量化：只注入 STATE.md 的前半部分（心境 + 最近项目 + 调度链路），砍掉历史冗余
     if (IS_ZCODE) {
-      const stateLines = state.trim().split('\n');
-      // 找到 "待办" 或 "注意事项" 的位置，之前的保留，之后的砍掉
+      const stateLines = state2.trim().split('\n');
+      // c3 (2026-07-22): 原代码外层 includes('待办')/includes('注意事项')/includes('##')
+      // 是死条件——内层已经要求 startsWith('##')，满足内层必然满足外层，外层从没单独生效过；
+      // 且原逻辑在第一个 `##`（i>5）就砍，跟注释"第二个 ## 之后开始砍掉"对不上（少保留了一节）。
+      // 改成真数到第二个顶级标题再砍，代码与注释意图一致。
       let cutIdx = stateLines.length;
+      let headerCount = 0;
       for (let i = 0; i < stateLines.length; i++) {
-        if (stateLines[i].includes('待办') || stateLines[i].includes('注意事项') || stateLines[i].includes('##')) {
-          // 第二个 ## 之后开始砍掉
-          if (stateLines[i].startsWith('##') && i > 5) {
+        if (stateLines[i].startsWith('##') && i > 5) {
+          headerCount++;
+          if (headerCount === 2) {
             cutIdx = i;
             break;
           }
@@ -420,7 +460,7 @@ function buildContext(userPrompt, input = {}) {
       }
       parts.push(stateLines.slice(0, cutIdx).join('\n'));
     } else {
-      parts.push(state.trim());
+      parts.push(state2.trim());
     }
     parts.push('');
   }
@@ -459,7 +499,9 @@ function buildContext(userPrompt, input = {}) {
 
   if (recall.length > 0) {
     parts.push('---');
-    parts.push(`## 💭 QMD · ${recall.length}`);
+    parts.push(recallSource === 'grep-floor'
+      ? `## 🔍 GREP-FLOOR · ${recall.length}（本地字面匹配，未过 embedding）`
+      : `## 💭 QMD · ${recall.length}`);
     parts.push('');
     const maxChars = config.max_recall_chars || 200;
     for (const r of recall) {
@@ -467,8 +509,14 @@ function buildContext(userPrompt, input = {}) {
       const file = r.file || r.source || '';
       if (content) {
         parts.push(`- **${file}**: ${content}...`);
+        if (r.linkBlock) parts.push(r.linkBlock);
       }
     }
+    parts.push('');
+  } else if (recall.failed) {
+    // 7/20: 查询失败显式化 — 别让我把"没查成"当成"没有这段记忆"
+    parts.push('---');
+    parts.push(`## 💭 QMD · ⚠️ ${recall.failed} — 这不代表没有相关记忆 需要时手动重查 /search_fast`);
     parts.push('');
   }
 

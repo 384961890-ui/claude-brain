@@ -54,8 +54,26 @@ a graph you do not own.
 |:---|:---|
 | **`memory-spec/`** | The structured-memory standard: three-layer index tree, dual-section records (current conclusion + append-only history = a file-native temporal knowledge graph), six memory types, wikilink graph layer, write-time gate, nightly gardener. Templates and four runnable scripts. |
 | **`qmd-engine/`** | Local semantic retrieval: embedding recall + reranker, resident daemon, atomic index rebuild, health checks. Off-the-shelf open models (Qwen3-Embedding-4B, Qwen3-Reranker-0.6B) — we trained nothing; we engineered everything around them. `PITFALLS.md` documents the incidents that paid for that engineering. |
-| **Core loops** (`v2`–`v6`, in the main repository) | Hook-based orthogonal loops that discipline LLM instincts: honesty checks, stuck-detection, idea triage, slop lights. Each loop targets one instinct; none replaces another. |
-| **Pipeline** (`scripts/`) | Intent-routed tiered retrieval (grep floor → embedding → reranker) and **graph-aware recall** — one-hop `[[wikilink]]` expansion at retrieval time, hard-capped. Merged into the main repository's hook pipeline. |
+| **Core loops** (`v2/`–`v6/`) | Hook-based orthogonal loops that discipline LLM instincts. Each loop targets one instinct; none replaces another. See the evolution table below. |
+| **Pipeline** (`scripts/`) | Injection + lesson-lifecycle machinery: intent-routed tiered retrieval (grep floor → embedding → reranker), **graph-aware recall** (one-hop `[[wikilink]]` expansion, hard-capped), correction-signal capture, decay with **efficacy attribution** (v8) that closes the loop between "which lesson got injected" and "how did that session actually go." |
+
+## Evolution · 演进史
+
+Brain was not designed in one shot. Each version answers a specific failure mode observed in production, and every previous layer is still shipped and still running — none is deprecated by a later one. The full history is in this repository; the table is a map.
+
+Brain 不是一次设计出来的。每一版都在治一个真实观察到的失败模式 而且**没有任何一层被后续版本替代 全部还在跑**。仓库里能翻到所有历史 下面这张表是地图。
+
+| Version | Instinct it disciplines · 治什么本能 | Where to look |
+|:---|:---|:---|
+| **v2 · honest-loop** | Self-deception — the model claims work is done when it isn't. Stop-hook captures correction signals from the human and turns them into draft lessons. | `v2/`, `scripts/capture-lesson.js` |
+| **v3 · think-loop** | Single-direction grinding — pushing harder at a stuck point instead of stepping back. Injects a breakout checklist when a stuck-flag is raised. | `v3/`, `scripts/inject-context.js` |
+| **v4 · idea-loop** | Sunk-cost persistence at the strategic layer — the CEO-agent forgetting to zoom out. Triggers on project-iteration contexts. | `v4/` |
+| **v5 · multimodal ingest** | Input surface too narrow — images, screenshots, PDFs never become recallable memory. Extends what can enter the memory tree. | `v5/` |
+| **v6 · slop red-light** | The lazy-shortcut instinct: writing shitcode because it's easier. PostToolUse hook lights an immediate red flag the moment it happens, forcing the choice: fix it, or write one line saying why not. | `v6/` |
+| **v7 · lesson lifecycle** | Old lessons accumulating into noise. Adds decay, archival, and rejection so the lesson set stays sharp instead of monotonically growing. | `scripts/decay-lessons.js`, `scripts/archive-rejected.js` |
+| **v8 · efficacy attribution** | *"Which of these lessons is actually working?"* A per-session behavior score gets attributed back to the lessons that were injected in that session — the first mechanism here that closes the loop between injection and outcome, not just injection and time. | `scripts/efficacy.js`, `scripts/track-behavior.js`, `scripts/analyze-behavior.js` |
+| **v8.1 · unified sanitized release** | The first attempt at a public, personally-scrubbed release of v2–v8. Later found to be incomplete — see v8.3. | git history from June 2026 |
+| **v8.2 → v8.3 · Graph engineering, released whole** | The gap that v8.1 left behind: the structured-memory standard we assumed "everyone would figure out," the local retrieval engine we assumed was too specific to share, and one-hop graph-aware recall. `memory-spec/` + `qmd-engine/` + `scripts/link-expand.js`. **Released whole; this is the final open release.** | This commit |
 
 ## What this is not · 这不是什么
 

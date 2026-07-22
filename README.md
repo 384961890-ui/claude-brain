@@ -6,6 +6,73 @@
 >
 > 记忆才是产品。其余一切都是脚手架。
 
+*Every morning you wake to a notebook on the pillow — only by reading it
+do you know who you are.*
+
+*The sticky note on the fridge is your only evidence of whether the
+vegetables have gone bad.*
+
+*The name tag hanging around your neck is the one thing that keeps you
+from getting lost.*
+
+*每天起床 枕边有一本笔记 翻阅它 你才知道自己是谁*
+
+*冰箱上的便利贴 是你判断蔬菜是否腐烂的唯一证据*
+
+*出门前脖子上挂的胸牌 保证了你不会走丢*
+
+## An agent is, by nature, an Alzheimer's patient. Brain is the cure. · Agent 本质上是一个阿兹海默患者 而 Brain 是解药
+
+Every session, you re-explain the project. Every session, it repeats the
+mistake you corrected last Tuesday. You have become a context-loading
+machine for a tool that forgets you the moment the window closes.
+The most expensive engineer on your team is you, re-teaching an intern
+who resets to day one every morning.
+
+每个 session 你都在重新解释项目背景。每个 session 它都在重犯你上周二刚纠正过的错。
+你已经变成了一台人肉上下文加载机 伺候一个窗口一关就把你忘光的工具。
+你团队里最贵的工程师是你自己——每天早上重新培训一个永远停留在入职第一天的实习生。
+
+**If your agent starts from zero every session, when does it ever become
+an expert?**
+
+**如果你的 agent 每次 session 都从零开始 它什么时候才能真正成为专家？**
+
+Brain exists to end that. Some tools make your AI faster today; Brain
+makes it better over time. This is not a project that wows you five
+minutes after install — it is the one that, three months in, makes you
+ask: *how did I ever work without this?*
+
+Brain 就是来终结这件事的。有些工具让 AI 今天更快 Brain 让 AI 随着时间变得更好。
+它不是装完五分钟就惊艳的项目 而是三个月后让你回头想
+"以前没有它 我到底是怎么工作的？"的那种项目。
+
+### What actually changes · 用了到底会怎样
+
+| | Without Brain | With Brain |
+|:--|:--|:--|
+| **Session 1** | A stranger. You explain everything. | A stranger. You explain everything. (Yes — no day-one magic. Read on.) |
+| **Session 10** | Still a stranger. | Knows your projects, your landmines, the decisions you already made. |
+| **Session 100** | Still a stranger. | A veteran who knows *why* the last change was made and what this one connects to. |
+| **Its mistakes** | Repeated forever. | Captured as lessons, injected back, and *audited* — v8 attributes real session outcomes to each lesson, so dead advice decays out. |
+| **Your data** | Buried in chat logs you'll never open. | A graph you can `cat`, `grep`, and `git diff`. Yours. |
+
+| | 没有 Brain | 有 Brain |
+|:--|:--|:--|
+| **第 1 次 session** | 陌生人 一切从头解释 | 陌生人 一切从头解释（对 第一天没有魔法 往下看） |
+| **第 10 次 session** | 还是陌生人 | 记得你的项目、你的雷区、你已经拍过的板 |
+| **第 100 次 session** | 还是陌生人 | 一个知道上次为什么改、这次连着什么的老兵 |
+| **它犯的错** | 永远重犯 | 被抓成教训 注入回去 还被**审计**——v8 把真实 session 表现归因到每条教训 没用的建议自动衰减出局 |
+| **你的数据** | 埋在你永远不会翻的聊天记录里 | 一张 `cat` 得到、`grep` 得到、`git diff` 得到的图谱 完全属于你 |
+
+The value of Brain is not that session 1 gets better.
+It is that **session 100 is stronger than session 1** — and keeps going.
+
+Brain 的价值不在于让第 1 次 session 更好
+而在于**让第 100 次 session 比第 1 次更强** 并且一直强下去。
+
+---
+
 This is the final, complete, open release of Brain. Everything is here.
 There will be no further open-source releases — not because we are done
 building, but because what comes next is built *on top of* what you are
